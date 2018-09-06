@@ -84,7 +84,22 @@ void loop()
      Serial.print("Engine off after ");Serial.print(runTime);Serial.print(" seconds.");  
      Serial.print("Total running time = ");Serial.print(totTime); Serial.print(" seconds. \r\n"); 
      /**************************************************************************************************************************************************
-      * "Finished" OLED screen message can be sent at this point 
+      * "Finished" OLED screen message can be sent at this point.
+     This is where the GSM module will be called into action. 
+     
+     We have to assume that as of this point, as the engine is stopped, the key will be turned off and the machine battery power may 
+     not be available for long enough to read the totTime from the eeprom and send it via the GSM network.
+     We will need either our own power source or leech the machines battery power independantly of the ignition switch state, long enough to complete the data comms and then turn ourself off.
+     This would require an ACKNOWLEDGED message back to the GSM module from the external data repository so that we can either attempt to retry the send for a period of time,
+     or, in the event of non-communications with the external repository, write a flag onto the eeprom to indicate that the totTime data has NOT been sent.
+     We can re-attempt delivery on the next startup and retry as often as needed during the next "Engine On" period.
+     
+     Another digital pin will be used to trigger the GSM module and it's associated read - send operations.
+     A seperate microcontroller could be used with the GSM module thus giving the GSM module complete autonomy once it has been triggered.
+     A modular, seperation of Timer and Data Comms functions could actually benefit the build stage and any in-the-field failures of either section.
+     It may also allow for a better ability to modify hardware for different environments or Machinery configurations.
       **************************************************************************************************************************************************/
+   
    }  
+ 
 }  
