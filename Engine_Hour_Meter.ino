@@ -1,12 +1,12 @@
 //Engine Hour Meter test code V 1.2
- 
+#include <EEPROM.h>
 double startTime = 0;  
 double stopTime = 0;  
 double runTime = 0;  /* Variable for time since current run began */
 double totTime = 0; /*Variable for accumulated run time. Initialising only. Will read real, accumulated totTime in from EEPROM later, and use that value as the starting point */
 int engineLed = 13; /* LED indication of running state for test purposes. Could be used for triggering relay, MOSFET, warning lamp, etc, in final production  */
 int engineRun = 8; /* input pin. To start "Engine Running" pull pin 8 HIGH. Pull to GND to stop. Most magneto ignition have a kill switch that pulls to GND. */
-int engineRunAux = 9 /* second auxiliary input pin. Crank sensor signal or Spark sensor signal to ensure actual engine running condition. Proof against false startup conditions, key left on, stall, starter motor cranking etc */
+int engineRunAux = 9; /* second auxiliary input pin. Crank sensor signal or Spark sensor signal to ensure actual engine running condition. Proof against false startup conditions, key left on, stall, starter motor cranking etc */
 boolean engineLastState = false;  /* Needed to initialise the variable but we don't want to set it HIGH or LOW as we need to read it and not assume. Setting FALSE appeases the compiler and still leaves our options open.*/  
 boolean engineRunning = false; /* OK to assume on first power-up, the engine is not running.
 /******************************************************************************************************************************** 
@@ -23,11 +23,12 @@ void setup()
  /* *************************************************************************************************************************
   *  EEPROM INIT AND READ-IN ROUTINE GOES HERE *
   ****************************************************************************************************************************/
-  totTime = 0 ; /* This is for testing ONLY.  In production, we will read in totTime value from an EEPROM   */ 
+  totTime = EEPROM.get(2,totTime) ; /* This is for testing ONLY.  In production, we will read in totTime value from an EEPROM   */ 
   /* First, send some human readable output to the serial port for test purposes*/
   Serial.println("Engine Run on pin 8");  
   Serial.println("Pull to 5v HIGH to run and pull to GND to stop");   
   Serial.println("no debounce on input yet");
+  Serial.print("Current total Runtime ");Serial.print(totTime);Serial.println(" seconds");
   /********************************************************************************************************************************************************
   * In future changes, Initial OLED screen messages will be sent at this point as well. Greeting, Branding, animations, any other warm and fuzzy shmooze
   **********************************************************************************************************************************************************/
@@ -81,25 +82,11 @@ void loop()
      /*************************************************************************************************************************************************
       * totTime will be written to eeprom at this point to ensure persistant totTime
       *************************************************************************************************************************************************/
-     Serial.print("Engine off after ");Serial.print(runTime);Serial.print(" seconds.");  
+     Serial.print("Engine off after ");Serial.print(runTime);Serial.println(" seconds.");  
      Serial.print("Total running time = ");Serial.print(totTime); Serial.print(" seconds. \r\n"); 
+     EEPROM.put(2, totTime);
      /**************************************************************************************************************************************************
-      * "Finished" OLED screen message can be sent at this point.
-     This is where the GSM module will be called into action. 
-     
-     We have to assume that as of this point, as the engine is stopped, the key will be turned off and the machine battery power may 
-     not be available for long enough to read the totTime from the eeprom and send it via the GSM network.
-     We will need either our own power source or leech the machines battery power independantly of the ignition switch state, long enough to complete the data comms and then turn ourself off.
-     This would require an ACKNOWLEDGED message back to the GSM module from the external data repository so that we can either attempt to retry the send for a period of time,
-     or, in the event of non-communications with the external repository, write a flag onto the eeprom to indicate that the totTime data has NOT been sent.
-     We can re-attempt delivery on the next startup and retry as often as needed during the next "Engine On" period.
-     
-     Another digital pin will be used to trigger the GSM module and it's associated read - send operations.
-     A seperate microcontroller could be used with the GSM module thus giving the GSM module complete autonomy once it has been triggered.
-     A modular, seperation of Timer and Data Comms functions could actually benefit the build stage and any in-the-field failures of either section.
-     It may also allow for a better ability to modify hardware for different environments or Machinery configurations.
+      * "Finished" OLED screen message can be sent at this point 
       **************************************************************************************************************************************************/
-   
    }  
- 
 }  
