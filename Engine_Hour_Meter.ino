@@ -1,11 +1,30 @@
-//Engine Hour Meter test code V 1.2
+//Engine Hour Meter test code V 1.4
+//Added EEPROM persistant Engine Hours 08/09/2018
+//Added TFT screen 09/09/2018
+//Moved engineRun pin from pin 8 to pin 4 for compatibility with TFT screen.
+
 #include <EEPROM.h>
+#include <SPI.h>
+#include <SD.h>
+#include <TFT.h>  // Arduino LCD library
+
+/* TFT and SD pin definition for the Uno */
+/* Using Hardware SPI pins for MOSI (SDA)11, MISO 12 and SCLK (SCL) 13 */
+/* SDA and SCL are shared between TFT and SD. Cable Select determines use */
+#define sd_cs  8
+#define lcd_cs 10
+#define dc     9
+#define rst    -1 /* Not assigned. Connect TFT rst to hardware reset pin. This enables screen reset with board reset. */
+
+TFT TFTscreen = TFT(lcd_cs, dc, rst); /* create an instance of the TFT library */
+PImage logo; /* this variable represents the logo image to be drawn on screen */
+char totHours[6];
 double startTime = 0;  
 double stopTime = 0;  
 double runTime = 0;  /* Variable for time since current run began */
 double totTime = 0; /*Variable for accumulated run time. Initialising only. Will read real, accumulated totTime in from EEPROM later, and use that value as the starting point */
 int engineLed = 13; /* LED indication of running state for test purposes. Could be used for triggering relay, MOSFET, warning lamp, etc, in final production  */
-int engineRun = 8; /* input pin. To start "Engine Running" pull pin 8 HIGH. Pull to GND to stop. Most magneto ignition have a kill switch that pulls to GND. */
+int engineRun = 4; /* input pin. To start "Engine Running" pull pin 4 HIGH. Pull to GND to stop. Most magneto ignition have a kill switch that pulls to GND. */
 int engineRunAux = 9; /* second auxiliary input pin. Crank sensor signal or Spark sensor signal to ensure actual engine running condition. Proof against false startup conditions, key left on, stall, starter motor cranking etc */
 boolean engineLastState = false;  /* Needed to initialise the variable but we don't want to set it HIGH or LOW as we need to read it and not assume. Setting FALSE appeases the compiler and still leaves our options open.*/  
 boolean engineRunning = false; /* OK to assume on first power-up, the engine is not running.
@@ -15,33 +34,62 @@ boolean engineRunning = false; /* OK to assume on first power-up, the engine is 
 // the setup routine runs once when you press reset or connect power.  
   
 void setup()  
-{                 
+{  
+   TFTscreen.begin(); /* Initialise TFT */
+  TFTscreen.background(0, 0, 0); /* Set background to BLACK */
+
   Serial.begin(9600); /* initialize serial port to 9600 baud   */
   pinMode(engineLed, OUTPUT); // initialize digital pin 13 as an output. 
   pinMode(engineRun, INPUT);  // initialise digital pin 8 as an input.
   digitalWrite(engineRun, HIGH); // turn on internal pull up resistor. Stops false "running" state if the input was floating. 
+ 
  /* *************************************************************************************************************************
-  *  EEPROM INIT AND READ-IN ROUTINE GOES HERE *
+  *  EEPROM INIT AND READ-IN ROUTINE *
   ****************************************************************************************************************************/
-  totTime = EEPROM.get(2,totTime) ; /* This is for testing ONLY.  In production, we will read in totTime value from an EEPROM   */ 
+  totTime = EEPROM.get(2,totTime) ; /* read in totTime value from EEPROM   */ 
+  
   /* First, send some human readable output to the serial port for test purposes*/
   Serial.println("Engine Run on pin 8");  
   Serial.println("Pull to 5v HIGH to run and pull to GND to stop");   
   Serial.println("no debounce on input yet");
   Serial.print("Current total Runtime ");Serial.print(totTime);Serial.println(" seconds");
   /********************************************************************************************************************************************************
-  * In future changes, Initial OLED screen messages will be sent at this point as well. Greeting, Branding, animations, any other warm and fuzzy shmooze
+  * Initial OLED screen messages will be sent at this point. Greeting, Branding, animations, any other warm and fuzzy shmooze
   **********************************************************************************************************************************************************/
+   // try to access the SD card. If that fails (e.g.
+  // no card present), the setup process will stop.
+  Serial.print(F("Initializing SD card..."));
+  if (!SD.begin(sd_cs)) {
+    Serial.println(F("failed!"));
+    return;
+  }
+  Serial.println(F("OK!"));
+  
+  TFTscreen.begin(); // initialize and clear the TFT screen
+  logo = TFTscreen.loadImage("centra.bmp");
+  TFTscreen.image(logo, 0, 0);
+  delay (2000); /* 2 second delay to display splash BMP */
+
+   TFTscreen.background(0, 0, 0);
+   TFTscreen.stroke(255, 255, 255); // set the font color to white
+   TFTscreen.setTextSize(1);  // set the font size
+   TFTscreen.text("Total Engine Hours :\n ", 0, 0); // write the text to the top left corner of the screen
+   TFTscreen.setTextSize(3);
+   String bigHours = String(totTime);
+   bigHours.toCharArray(totHours, 6);
+   TFTscreen.stroke(0, 255, 0);
+   TFTscreen.text(totHours, 0, 20);
 }  
 
   
 /*********************************************************************************************************************************
  * Main program loop starts here.....  
  ********************************************************************************************************************************/
-void loop()  
-{  
-  engineLastState = digitalRead(engineRun); /*This checks if the kill switch is on or off by reading pin engineRun, which we declared to be pin 8,
-  and setting engineLastState to pin 8's current logic level. IE: HIGH or LOW.
+void loop()  {  
+    
+    
+  engineLastState = digitalRead(engineRun); /*This checks if the kill switch is on or off by reading pin engineRun, which we declared to be pin 4,
+  and setting engineLastState to pin 4's current logic level. IE: HIGH or LOW.
   If the key is off, the kill switch is grounded and as such, pin 8 will be LOW. If the key is on, the kill switch is lifted from ground and pin 8's internal pullup resistor will pull pin 8 HIGH*/
  
   /* *********************************************************************************************************************************
@@ -70,6 +118,10 @@ void loop()
      * Function will need a timer so that we only update the OLED once every second, and a conversion on totTime to display totTime value on OLED in Hours:Minutes:Seconds
      * We could also display current runTime
       *********************************************************************************************************************************************************/
+      TFTscreen.background(0, 0, 0);
+      TFTscreen.stroke(0, 255, 0); // set the font color to green
+      TFTscreen.setTextSize(1);  // set the font size
+      TFTscreen.text("Engine on, Starting Timer... ", 0, 0); // write the text to the top left corner of the screen
    }  
    else if (engineRunning == true && engineLastState ==LOW) /* sense LOW prevents entering here more than once  */
    {  
@@ -88,5 +140,24 @@ void loop()
      /**************************************************************************************************************************************************
       * "Finished" OLED screen message can be sent at this point 
       **************************************************************************************************************************************************/
+      TFTscreen.background(0, 0, 0);
+      TFTscreen.stroke(255, 0, 0); // set the font color to red
+      TFTscreen.setTextSize(1);  // set the font size
+      TFTscreen.text("Engine off after ", 0, 0); // write the text to the top left corner of the screen
+      /****  More maths and variables required for Session runtime to Screen.  This TFT library blows goat !! ****/
+      TFTscreen.text("seconds", 0, 20);
+      delay(2000);
+      TFTscreen.background(0, 0, 0);
+      TFTscreen.stroke(255, 255, 255); // set the font color to white
+      TFTscreen.setTextSize(1);  // set the font size
+      TFTscreen.text("Total Engine Hours :\n ", 0, 0); // write the text to the top left corner of the screen
+      TFTscreen.setTextSize(3);
+      String bigHours = String(totTime);
+      bigHours.toCharArray(totHours, 6);
+      TFTscreen.stroke(0, 255, 0);
+      TFTscreen.text(totHours, 0, 20);
+      TFTscreen.setTextSize(1);
+      TFTscreen.stroke(0, 0, 255); //Set font colour BLUE !
+      TFTscreen.text("Engine Data uploading...", 0, 60);
    }  
 }  
