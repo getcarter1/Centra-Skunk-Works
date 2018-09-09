@@ -18,11 +18,12 @@
 
 TFT TFTscreen = TFT(lcd_cs, dc, rst); /* create an instance of the TFT library */
 PImage logo; /* this variable represents the logo image to be drawn on screen */
-char totHours[6];
+char totHours[6]; //Only here for the benefit of the stupid TFT library.
 double startTime = 0;  
 double stopTime = 0;  
 double runTime = 0;  /* Variable for time since current run began */
-double totTime = 0; /*Variable for accumulated run time. Initialising only. Will read real, accumulated totTime in from EEPROM later, and use that value as the starting point */
+String uID = "12345678ABCDEF"; /* Initialiser for the Unique Identifier. Likely to be the Chassis number. */
+double totTime = 0; /*The main one. Variable for 4 byte (32bit precision, floating point), accumulated run time. Initialising only. Will read real, accumulated totTime in from EEPROM later, and use that value as the starting point */
 int engineLed = 13; /* LED indication of running state for test purposes. Could be used for triggering relay, MOSFET, warning lamp, etc, in final production  */
 int engineRun = 4; /* input pin. To start "Engine Running" pull pin 4 HIGH. Pull to GND to stop. Most magneto ignition have a kill switch that pulls to GND. */
 int engineRunAux = 9; /* second auxiliary input pin. Crank sensor signal or Spark sensor signal to ensure actual engine running condition. Proof against false startup conditions, key left on, stall, starter motor cranking etc */
@@ -46,8 +47,20 @@ void setup()
  /* *************************************************************************************************************************
   *  EEPROM INIT AND READ-IN ROUTINE *
   ****************************************************************************************************************************/
-  totTime = EEPROM.get(2,totTime) ; /* read in totTime value from EEPROM   */ 
-  
+  uID = EEPROM.get(0, uID) ; /* read in 2 byte uID value from EEPROM startinmg at first byte. */
+  totTime = EEPROM.get(2,totTime) ; /* read in 2 byte totTime value from EEPROM starting at third byte  */ 
+  /**************************************************************************************************************************
+   * Will add a routine for checking EEPROM for a unique ID and if not present, handoff to a function to allow writing 
+   * of an ID to the EEPROM.  This will be a "write once" mechanism. It should NEVER change value.
+   * Something like this....
+   * from Serial grab characters and push into String uID
+   * then...  
+   * for(int i=10; i<x.length; i++){   //start writing at EEPROM byte 10 for a length of number of characters in uID
+	*  EEPROM.write(i, x[i]);
+  * }
+  * Read back the same way.
+   **************************************************************************************************************************/ 
+
   /* First, send some human readable output to the serial port for test purposes*/
   Serial.println("Engine Run on pin 8");  
   Serial.println("Pull to 5v HIGH to run and pull to GND to stop");   
@@ -159,5 +172,9 @@ void loop()  {
       TFTscreen.setTextSize(1);
       TFTscreen.stroke(0, 0, 255); //Set font colour BLUE !
       TFTscreen.text("Engine Data uploading...", 0, 60);
+      /****************************************************************************************************************************
+      * This where we will hand off to the GSM module for transfering of the EEPROM Data
+      * 
+      * ***************************************************************************************************************************/
    }  
 }  
