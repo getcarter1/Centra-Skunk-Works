@@ -47,7 +47,7 @@ void setup()
  /* *************************************************************************************************************************
   *  EEPROM INIT AND READ-IN ROUTINE *
   ****************************************************************************************************************************/
-  uID = EEPROM.get(0, uID) ; /* read in 2 byte uID value from EEPROM startinmg at first byte. */
+  
   totTime = EEPROM.get(2,totTime) ; /* read in 2 byte totTime value from EEPROM starting at third byte  */ 
   /**************************************************************************************************************************
    * Will add a routine for checking EEPROM for a unique ID and if not present, handoff to a function to allow writing 
@@ -60,8 +60,10 @@ void setup()
   * }
   * Read back the same way.
    **************************************************************************************************************************/ 
+  /* read in uID value from EEPROM as an array, starting at 10th byte for X bytes, depending on length of final uID's */
+  /* convert array to a string and make String uID = to that string.*/
 
-  /* First, send some human readable output to the serial port for test purposes*/
+  /* Send some human readable output to the serial port for test purposes */
   Serial.println("Engine Run on pin 8");  
   Serial.println("Pull to 5v HIGH to run and pull to GND to stop");   
   Serial.println("no debounce on input yet");
@@ -69,8 +71,7 @@ void setup()
   /********************************************************************************************************************************************************
   * Initial OLED screen messages will be sent at this point. Greeting, Branding, animations, any other warm and fuzzy shmooze
   **********************************************************************************************************************************************************/
-   // try to access the SD card. If that fails (e.g.
-  // no card present), the setup process will stop.
+   // try to access the SD card for drawing the logo.
   Serial.print(F("Initializing SD card..."));
   if (!SD.begin(sd_cs)) {
     Serial.println(F("failed!"));
