@@ -14,7 +14,10 @@ U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/ SCL, /* data=*/ SD
 
 char totHours[6];
 double startTime = 0;  
-double stopTime = 0;  
+double stopTime = 0; 
+double sessionTime = 0; 
+double currentTime = 0;
+double showTime = 0;
 double runTime = 0;  /* Variable for time since current run began */
 float totTime = 0; /*Variable for accumulated run time. Initialising only. Will read real, accumulated totTime in from EEPROM later, and use that value as the starting point */
 int engineLed = D4; /* LED indication of running state for test purposes. Could be used for triggering relay, MOSFET, warning lamp, etc, in final production  */
@@ -28,8 +31,8 @@ void setup(void) {
   u8g2.begin();
   Serial.begin(9600); /* initialize serial port to 9600 baud   */
   pinMode(engineLed, OUTPUT); // initialize digital pin 13 as an output. 
-  pinMode(engineRun, INPUT);  // initialise digital pin 8 as an input.
-  digitalWrite(engineRun, HIGH); // turn on internal pull up resistor. Stops false "running" state if the input was floating. 
+  pinMode(engineRun, INPUT_PULLUP);  // initialise digital pin 8 as an input.
+  //digitalWrite(engineRun, HIGH); // turn on internal pull up resistor. Stops false "running" state if the input was floating. 
  
  /* *************************************************************************************************************************
   *  EEPROM INIT AND READ-IN ROUTINE *
@@ -47,9 +50,11 @@ void setup(void) {
    bigHours.toCharArray(totHours, 6);
    u8g2.clearBuffer();          // clear the internal memory
   u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-  u8g2.drawStr(0,10,"ENGINE HOURS");  // write something to the internal memory
-  u8g2.sendBuffer();          // transfer internal memory to the display
-  u8g2.drawStr(0,20,totHours);  // write something to the internal memory
+  u8g2.drawStr(0,10,"TOTAL ENGINE TIME");  // write something to the internal memory
+  u8g2.setFont(u8g2_font_cu12_tr);       
+  u8g2.drawStr(0,40,totHours);  // write something to the internal memory
+  u8g2.setFont(u8g2_font_ncenB08_tr);
+  u8g2.drawStr(70,40,"sec");
   u8g2.sendBuffer();          // transfer internal memory to the display
   delay(2000);
 }
@@ -65,9 +70,28 @@ void loop(void) {
    *  to proof against false start conditions. I.E. Key on but engine not actually started or engine cranking but not actually starting 
    *  due to mechanicle failure or lack of fuel, stall condition ETC.
    *  Will read crank sensor or spark and look for multiple pulses in a set number of seconds to establish TRUE condition.
-   ***************************************************************************************************************************************/
   
-  if (engineRunning == false && engineLastState==HIGH) /***** NB !!!!  MUST use double == in order to do a comparison vs an assignment. 
+   ***************************************************************************************************************************************/
+  if (engineRunning == true && engineLastState==HIGH)
+  {
+     currentTime = millis();  
+     showTime =(currentTime - sessionTime)/1000;
+     String bigHours = String(showTime);
+     bigHours.toCharArray(totHours, 16);
+     u8g2.setFontMode(1);
+     u8g2.setFont(u8g2_font_ncenB08_tr);
+     u8g2.drawStr(0,10," Engine on "); 
+     u8g2.setFont(u8g2_font_cu12_tr);
+     u8g2.drawStr(0,40,totHours);
+     u8g2.setFont(u8g2_font_ncenB08_tr);
+     u8g2.drawStr(70,40,"sec");
+     u8g2.sendBuffer();          // transfer internal memory to the display
+     u8g2.setFontMode(0);
+     u8g2.setFont(u8g2_font_cu12_hr);
+     u8g2.sendBuffer();
+     u8g2.clearBuffer();          // clear the internal memory
+}
+  else if (engineRunning == false && engineLastState==HIGH) /***** NB !!!!  MUST use double == in order to do a comparison vs an assignment. 
   Note the difference between engineLastState=HIGH (assignment) and engineLastState==HIGH (comparison). BIG difference in outcome if engineLastState was actually LOW.
   We would wind up resetting our runTime without adding it to totTime in the following code */  
 
@@ -78,18 +102,18 @@ void loop(void) {
       
      digitalWrite(engineLed, LOW);
      engineRunning = true;  
+     currentTime = 0;
      runTime = 0; /* reset to 0 as it is either first start or, we are turning on again and therefore the last runTime has already been added to accumulated totTime   */
-     startTime = millis();  
+     sessionTime = millis();
+     startTime = millis(); 
+      
      Serial.println("Engine on, Starting Timer... "); 
-  u8g2.clearBuffer();          // clear the internal memory
-  u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-  u8g2.drawStr(0,10," Engine on, ");  // write something to the internal memory
-  u8g2.drawStr(0,20," Starting Timer... ");
-   String bigHours = String(totTime);
-   bigHours.toCharArray(totHours, 6);
-  u8g2.drawStr(0,50,totHours);
-  u8g2.sendBuffer();          // transfer internal memory to the display
-   
+      u8g2.clearBuffer();          // clear the internal memory
+      u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+      u8g2.drawStr(0,10," Engine on, ");  // write something to the internal memory
+      u8g2.drawStr(0,20," Starting Timer... ");
+      u8g2.sendBuffer();          // transfer internal memory to the display
+     delay(200);
    }  
    else if (engineRunning == true && engineLastState ==LOW) /* sense LOW prevents entering here more than once  */
    {  
@@ -107,12 +131,15 @@ void loop(void) {
      EEPROM.put(0, totTime);
      EEPROM.commit();
      u8g2.clearBuffer();          // clear the internal memory
-  u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-  u8g2.drawStr(0,10," Engine off ");  // write something to the internal memory
-   u8g2.drawStr(0,20,"Engine ran for: ");
-    String bigHours = String(runTime);
-   bigHours.toCharArray(totHours, 6);
-  u8g2.drawStr(0,50,totHours);
-  u8g2.sendBuffer();          // transfer internal memory to the display
+     u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+     u8g2.drawStr(0,10," Engine off after");  // write something to the internal memory
+     //u8g2.drawStr(0,20,"Engine ran for: ");
+     String bigHours = String(runTime);
+     bigHours.toCharArray(totHours, 6);
+      u8g2.setFont(u8g2_font_cu12_tr);
+     u8g2.drawStr(0,40,totHours);
+     u8g2.setFont(u8g2_font_ncenB08_tr);
+     u8g2.drawStr(70,40,"sec");
+     u8g2.sendBuffer();          // transfer internal memory to the display
 }
 }
