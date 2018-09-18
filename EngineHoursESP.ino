@@ -2,13 +2,9 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <EEPROM.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
 
-#ifdef U8X8_HAVE_HW_SPI
-#include <SPI.h>
-#endif
-#ifdef U8X8_HAVE_HW_I2C
-#include <Wire.h>
-#endif
 
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/ SCL, /* data=*/ SDA, /* reset=*/ U8X8_PIN_NONE);   // All Boards without Reset of the Display
 
@@ -29,6 +25,20 @@ boolean engineRunning = false; /* OK to assume on first power-up, the engine is 
 
 void setup(void) {
   u8g2.begin();
+  WiFi.begin("RPI", "raspberry");   //WiFi connection
+  
+  while (WiFi.status() != WL_CONNECTED) {  //Wait for the WiFI connection completion
+  delay(500);
+  Serial.println("Waiting for connection");
+  u8g2.clearBuffer();          // clear the internal memory
+  u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+  u8g2.drawStr(0,60,"Waiting for WiFi");
+  u8g2.sendBuffer();
+  }
+   delay(500);
+  u8g2.drawStr(0,60,"WiFi ready");
+  u8g2.sendBuffer();
+  
   Serial.begin(9600); /* initialize serial port to 9600 baud   */
   pinMode(engineLed, OUTPUT); // initialize digital pin 13 as an output. 
   pinMode(engineRun, INPUT_PULLUP);  // initialise digital pin 8 as an input.
@@ -47,7 +57,7 @@ void setup(void) {
   Serial.println("no debounce on input yet");
   Serial.print("Current total Runtime ");Serial.print(totTime);Serial.println(" seconds");
   String bigHours = String(totTime);
-   bigHours.toCharArray(totHours, 6);
+   bigHours.toCharArray(totHours, 16);
    u8g2.clearBuffer();          // clear the internal memory
   u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
   u8g2.drawStr(0,10,"TOTAL ENGINE TIME");  // write something to the internal memory
@@ -76,8 +86,8 @@ void loop(void) {
   {
      currentTime = millis();  
      showTime =(currentTime - sessionTime)/1000;
-     String bigHours = String(showTime);
-     bigHours.toCharArray(totHours, 16);
+     String smallHours = String(showTime);
+     smallHours.toCharArray(totHours, 16);
      u8g2.setFontMode(1);
      u8g2.setFont(u8g2_font_ncenB08_tr);
      u8g2.drawStr(0,10," Engine on "); 
@@ -108,11 +118,11 @@ void loop(void) {
      startTime = millis(); 
       
      Serial.println("Engine on, Starting Timer... "); 
-      u8g2.clearBuffer();          // clear the internal memory
-      u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-      u8g2.drawStr(0,10," Engine on, ");  // write something to the internal memory
-      u8g2.drawStr(0,20," Starting Timer... ");
-      u8g2.sendBuffer();          // transfer internal memory to the display
+     u8g2.clearBuffer();          // clear the internal memory
+     u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+     u8g2.drawStr(0,10," Engine on, ");  // write something to the internal memory
+     u8g2.drawStr(0,20," Starting Timer... ");
+     u8g2.sendBuffer();          // transfer internal memory to the display
      delay(200);
    }  
    else if (engineRunning == true && engineLastState ==LOW) /* sense LOW prevents entering here more than once  */
@@ -133,13 +143,58 @@ void loop(void) {
      u8g2.clearBuffer();          // clear the internal memory
      u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
      u8g2.drawStr(0,10," Engine off after");  // write something to the internal memory
-     //u8g2.drawStr(0,20,"Engine ran for: ");
-     String bigHours = String(runTime);
-     bigHours.toCharArray(totHours, 6);
-      u8g2.setFont(u8g2_font_cu12_tr);
+     String smallHours = String(runTime);
+     smallHours.toCharArray(totHours, 6);
+     u8g2.setFont(u8g2_font_cu12_tr);
      u8g2.drawStr(0,40,totHours);
      u8g2.setFont(u8g2_font_ncenB08_tr);
      u8g2.drawStr(70,40,"sec");
      u8g2.sendBuffer();          // transfer internal memory to the display
+     delay(1000);
+     
+     u8g2.drawStr(0,60,"Sending data");
+     u8g2.sendBuffer();
+     /**************************************************************************************************************
+      * HTTP JSON DATA UPLOAD SECTION
+      * ***********************************************************************************************************/
+     HTTPClient http;    //Declare object of class HTTPClient
+     http.begin("http://10.1.1.26:8080/api/v1/cZkLsij6KXANn2sKKjRN/telemetry");      //Specify request destination
+     http.addHeader("Content-Type", "application/json");  //Specify content-type header
+                        
+         // Prepare a JSON payload string
+  String payload = "{";
+  payload += "\"Total Hours\":"; payload += totTime; 
+  payload += "}";
+
+  // Send payload
+  char attributes[100];
+  payload.toCharArray( attributes, 100 );
+  int httpCode = http.POST( attributes );
+  Serial.println( attributes );
+     Serial.println(httpCode);   //Print HTTP return code
+     Serial.println(payload);    //Print request response payload
+
+ 
+
+     http.end();  //Close connection
+     u8g2.setFontMode(0);
+     u8g2.setFont(u8g2_font_cu12_hr);
+     u8g2.sendBuffer();
+     u8g2.clearBuffer();
+     u8g2.setFont(u8g2_font_ncenB08_tr);          
+     u8g2.drawStr(0,60,"Data sent");
+     u8g2.sendBuffer();
+     delay(2000);
+     
+     String bigHours = String(totTime);
+     bigHours.toCharArray(totHours, 16);
+     u8g2.clearBuffer();         
+     u8g2.setFont(u8g2_font_ncenB08_tr);
+     u8g2.drawStr(0,10,"TOTAL ENGINE TIME");  
+     u8g2.setFont(u8g2_font_cu12_tr);       
+     u8g2.drawStr(0,40,totHours);  
+     u8g2.setFont(u8g2_font_ncenB08_tr);
+     u8g2.drawStr(70,40,"sec");
+     u8g2.sendBuffer();         
 }
 }
