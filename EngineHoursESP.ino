@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <EEPROM.h>
-#include <ESP8266HTTPClient.h>
+ #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 
 
@@ -25,20 +25,26 @@ boolean engineRunning = false; /* OK to assume on first power-up, the engine is 
 
 void setup(void) {
   u8g2.begin();
+  u8g2.clearBuffer();          // clear the internal memory
+  u8g2.setFont(u8g2_font_profont12_mr); // choose a suitable font
+  u8g2.drawStr(10,50,"Reticulating Splines..");
+  u8g2.sendBuffer();
+  delay(500);
   WiFi.begin("RPI", "raspberry");   //WiFi connection
   
   while (WiFi.status() != WL_CONNECTED) {  //Wait for the WiFI connection completion
   delay(500);
   Serial.println("Waiting for connection");
   u8g2.clearBuffer();          // clear the internal memory
-  u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-  u8g2.drawStr(0,60,"Waiting for WiFi");
+  u8g2.setFont(u8g2_font_profont12_mr); // choose a suitable font
+  u8g2.drawStr(10,50,"Waiting for WiFi");
   u8g2.sendBuffer();
   }
    delay(500);
-  u8g2.drawStr(0,60,"WiFi ready");
+   u8g2.clearBuffer();
+  u8g2.drawStr(20,50,"WiFi ready");
   u8g2.sendBuffer();
-  
+   delay(500);
   Serial.begin(9600); /* initialize serial port to 9600 baud   */
   pinMode(engineLed, OUTPUT); // initialize digital pin 13 as an output. 
   pinMode(engineRun, INPUT_PULLUP);  // initialise digital pin 8 as an input.
@@ -59,12 +65,19 @@ void setup(void) {
   String bigHours = String(totTime);
    bigHours.toCharArray(totHours, 16);
    u8g2.clearBuffer();          // clear the internal memory
-  u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-  u8g2.drawStr(0,10,"TOTAL ENGINE TIME");  // write something to the internal memory
-  u8g2.setFont(u8g2_font_cu12_tr);       
-  u8g2.drawStr(0,40,totHours);  // write something to the internal memory
-  u8g2.setFont(u8g2_font_ncenB08_tr);
-  u8g2.drawStr(70,40,"sec");
+  u8g2.setFont(u8g2_font_profont12_mf); // choose a suitable font
+  u8g2.drawStr(8,10,"TOTAL ENGINE TIME");  // write something to the internal memory
+  u8g2.setFont(u8g2_font_profont22_mn); 
+     unsigned long allSeconds=totTime;
+     int runHours= allSeconds/3600;
+     int secsRemaining=allSeconds%3600;
+     int runMinutes=secsRemaining/60;
+     int runSeconds=secsRemaining%60;
+     char buf[21];
+     sprintf(buf,"%02d:%02d:%02d",runHours,runMinutes,runSeconds);      
+  u8g2.drawStr(10,50,buf);  // write something to the internal memory
+  //u8g2.setFont(u8g2_font_ncenB08_tr);
+  //u8g2.drawStr(70,40,"sec");
   u8g2.sendBuffer();          // transfer internal memory to the display
   delay(2000);
 }
@@ -89,15 +102,15 @@ void loop(void) {
      String smallHours = String(showTime);
      smallHours.toCharArray(totHours, 16);
      u8g2.setFontMode(1);
-     u8g2.setFont(u8g2_font_ncenB08_tr);
+     u8g2.setFont(u8g2_font_profont12_mf);
      u8g2.drawStr(0,10," Engine on "); 
-     u8g2.setFont(u8g2_font_cu12_tr);
-     u8g2.drawStr(0,40,totHours);
-     u8g2.setFont(u8g2_font_ncenB08_tr);
-     u8g2.drawStr(70,40,"sec");
+     u8g2.setFont(u8g2_font_profont22_mn);
+     u8g2.drawStr(0,50,totHours);
+     u8g2.setFont(u8g2_font_profont12_mf);
+     u8g2.drawStr(90,50,"sec");
      u8g2.sendBuffer();          // transfer internal memory to the display
      u8g2.setFontMode(0);
-     u8g2.setFont(u8g2_font_cu12_hr);
+     u8g2.setFont(u8g2_font_profont22_mn);
      u8g2.sendBuffer();
      u8g2.clearBuffer();          // clear the internal memory
 }
@@ -119,11 +132,11 @@ void loop(void) {
       
      Serial.println("Engine on, Starting Timer... "); 
      u8g2.clearBuffer();          // clear the internal memory
-     u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-     u8g2.drawStr(0,10," Engine on, ");  // write something to the internal memory
+     u8g2.setFont(u8g2_font_profont12_mf); // choose a suitable font
+     u8g2.drawStr(0,10," Engine on ");  // write something to the internal memory
      u8g2.drawStr(0,20," Starting Timer... ");
      u8g2.sendBuffer();          // transfer internal memory to the display
-     delay(200);
+     delay(1000);
    }  
    else if (engineRunning == true && engineLastState ==LOW) /* sense LOW prevents entering here more than once  */
    {  
@@ -141,14 +154,14 @@ void loop(void) {
      EEPROM.put(0, totTime);
      EEPROM.commit();
      u8g2.clearBuffer();          // clear the internal memory
-     u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+     u8g2.setFont(u8g2_font_profont12_mf); // choose a suitable font
      u8g2.drawStr(0,10," Engine off after");  // write something to the internal memory
      String smallHours = String(runTime);
      smallHours.toCharArray(totHours, 6);
-     u8g2.setFont(u8g2_font_cu12_tr);
-     u8g2.drawStr(0,40,totHours);
-     u8g2.setFont(u8g2_font_ncenB08_tr);
-     u8g2.drawStr(70,40,"sec");
+     u8g2.setFont(u8g2_font_profont22_mn);
+     u8g2.drawStr(0,50,totHours);
+     u8g2.setFont(u8g2_font_profont12_mf);
+     u8g2.drawStr(90,50,"sec");
      u8g2.sendBuffer();          // transfer internal memory to the display
      delay(1000);
      
@@ -160,41 +173,54 @@ void loop(void) {
      HTTPClient http;    //Declare object of class HTTPClient
      http.begin("http://10.1.1.26:8080/api/v1/cZkLsij6KXANn2sKKjRN/telemetry");      //Specify request destination
      http.addHeader("Content-Type", "application/json");  //Specify content-type header
-                        
+      u8g2.drawStr(0,60,"Sending data.");
+     u8g2.sendBuffer();                  
          // Prepare a JSON payload string
   String payload = "{";
   payload += "\"Total Hours\":"; payload += totTime; 
   payload += "}";
-
+      u8g2.drawStr(0,60,"Sending data..");
+     u8g2.sendBuffer();
   // Send payload
   char attributes[100];
   payload.toCharArray( attributes, 100 );
+  u8g2.drawStr(0,60,"Sending data....");
+     u8g2.sendBuffer();
   int httpCode = http.POST( attributes );
   Serial.println( attributes );
      Serial.println(httpCode);   //Print HTTP return code
      Serial.println(payload);    //Print request response payload
-
- 
+     
+      u8g2.drawStr(0,60,"Sending data......");
+     u8g2.sendBuffer();
 
      http.end();  //Close connection
      u8g2.setFontMode(0);
      u8g2.setFont(u8g2_font_cu12_hr);
      u8g2.sendBuffer();
-     u8g2.clearBuffer();
-     u8g2.setFont(u8g2_font_ncenB08_tr);          
+     //u8g2.clearBuffer();
+     u8g2.setFont(u8g2_font_profont12_mf);
+     u8g2.drawStr(0,60,"                    ");          
      u8g2.drawStr(0,60,"Data sent");
      u8g2.sendBuffer();
      delay(2000);
      
-     String bigHours = String(totTime);
-     bigHours.toCharArray(totHours, 16);
+     //String bigHours = String(totTime);
+     //bigHours.toCharArray(totHours, 16);
+     unsigned long allSeconds=totTime;
+     int runHours= allSeconds/3600;
+     int secsRemaining=allSeconds%3600;
+     int runMinutes=secsRemaining/60;
+     int runSeconds=secsRemaining%60;
+     char buf[21];
+     sprintf(buf,"%02d:%02d:%02d",runHours,runMinutes,runSeconds);
      u8g2.clearBuffer();         
-     u8g2.setFont(u8g2_font_ncenB08_tr);
-     u8g2.drawStr(0,10,"TOTAL ENGINE TIME");  
-     u8g2.setFont(u8g2_font_cu12_tr);       
-     u8g2.drawStr(0,40,totHours);  
-     u8g2.setFont(u8g2_font_ncenB08_tr);
-     u8g2.drawStr(70,40,"sec");
+     u8g2.setFont(u8g2_font_profont12_mf);
+     u8g2.drawStr(8,10,"TOTAL ENGINE TIME");  
+     u8g2.setFont(u8g2_font_profont22_mn);       
+     u8g2.drawStr(10,50,buf);  
+     //u8g2.setFont(u8g2_font_profont22_mn);
+     //u8g2.drawStr(70,40,"sec");
      u8g2.sendBuffer();         
 }
 }
